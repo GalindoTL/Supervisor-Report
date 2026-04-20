@@ -1039,251 +1039,351 @@ function exportPDF(){
   const dayKey=gv_('rpt-day');
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({unit:'pt',format:'letter',orientation:'portrait'});
-  const PW=612,PH=792,ML=50,MR=50,MT=50,cW=PW-ML-MR;
+  const PW=612,PH=792,ML=45,MR=45,MT=45,cW=PW-ML-MR;
   let y=MT;
-  const NAVY=[13,45,94],MBLUE=[46,95,163],LGRAY=[245,245,245],DGRAY=[51,51,51],RED=[192,57,43],GREEN=[26,92,62],AMBER=[125,78,0],WHITE=[255,255,255],MBLUE2=[214,228,247];
+  const NAVY=[13,45,94],MBLUE=[46,95,163],LGRAY=[242,245,250],DGRAY=[40,40,40],
+        RED=[192,57,43],GREEN=[26,92,62],AMBER=[125,78,0],WHITE=[255,255,255],
+        LBLUE=[214,228,247],BORDER=[210,218,230];
 
-  function addPage(){doc.addPage();y=MT;}
-  function checkY(need){if(y+need>PH-40)addPage();}
+  function newPage(){doc.addPage();y=MT;}
+  function checkY(need){if(y+need>PH-50)newPage();}
 
-  // Draw logo text header (since we have base64 image)
-  const logoB64='${LOGO_B64}';
-  try{
-    doc.addImage('data:image/png;base64,'+logoB64,'PNG',ML,y,160,25);
-  }catch(e){
-    doc.setFont('Helvetica','bold');doc.setFontSize(14);doc.setTextColor(...NAVY);
-    doc.text('PENN ALUMINUM INTERNATIONAL LLC',ML,y+15);
+  // ── Header ────────────────────────────────────────────────────────────────
+  const logoB64='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';
+  try{doc.addImage('data:image/png;base64,'+logoB64,'PNG',ML,y,190,30);}
+  catch(e){
+    doc.setFont('Helvetica','bold');doc.setFontSize(13);doc.setTextColor(...NAVY);
+    doc.text('PENN ALUMINUM INTERNATIONAL LLC',ML,y+20);
   }
-
-  // Report type label top right
-  doc.setFont('Helvetica','bold');doc.setFontSize(9);doc.setTextColor(...NAVY);
-  const rptLabel=type==='weekly'?'WEEKLY SUPERVISOR REPORT':'DAILY SHIFT REPORT';
-  doc.text(rptLabel,PW-MR,y+10,{align:'right'});
   const wd=weekDays();
-  doc.setFont('Helvetica','normal');doc.setFontSize(8);doc.setTextColor(100,100,100);
+  const rptLabel=type==='weekly'?'WEEKLY SUPERVISOR REPORT':'DAILY SHIFT REPORT';
+  doc.setFont('Helvetica','bold');doc.setFontSize(10);doc.setTextColor(...NAVY);
+  doc.text(rptLabel,PW-MR,y+12,{align:'right'});
+  doc.setFont('Helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(100,100,100);
   if(type==='weekly'){
-    doc.text(MN[wd[0].getMonth()]+' '+wd[0].getDate()+' - '+MN[wd[4].getMonth()]+' '+wd[4].getDate()+', '+wd[4].getFullYear(),PW-MR,y+21,{align:'right'});
+    const selDays=getSelectedWeekDays();
+    doc.text(MN[selDays[0].getMonth()]+' '+selDays[0].getDate()+' - '+MN[selDays[selDays.length-1].getMonth()]+' '+selDays[selDays.length-1].getDate()+', '+selDays[0].getFullYear(),PW-MR,y+24,{align:'right'});
   }else{
     const dd=new Date(dayKey+'T12:00:00');
-    doc.text(DN[dd.getDay()]+', '+MN[dd.getMonth()]+' '+dd.getDate()+', '+dd.getFullYear(),PW-MR,y+21,{align:'right'});
+    doc.text(DN[dd.getDay()]+', '+MN[dd.getMonth()]+' '+dd.getDate()+', '+dd.getFullYear(),PW-MR,y+24,{align:'right'});
   }
-  y+=35;
+  y+=38;
+  doc.setDrawColor(...NAVY);doc.setLineWidth(1.5);doc.line(ML,y,PW-MR,y);y+=6;
 
-  // Header rule
-  doc.setDrawColor(...NAVY);doc.setLineWidth(1.5);doc.line(ML,y,PW-MR,y);y+=8;
+  // Supervisor info row
+  doc.setFontSize(8.5);doc.setTextColor(...DGRAY);
+  const infoItems=[
+    ['Supervisor:',S.supervisor],['Dept:',S.dept],['Shift:',S.shift]
+  ];
+  let ix=ML;
+  infoItems.forEach(([lbl,val])=>{
+    doc.setFont('Helvetica','bold');doc.text(lbl,ix,y+8);
+    doc.setFont('Helvetica','normal');doc.text(val,ix+doc.getTextWidth(lbl)+3,y+8);
+    ix+=Math.max(doc.getTextWidth(lbl+val)+20,140);
+  });
+  y+=14;
+  doc.setFont('Helvetica','bold');doc.text('Facility:',ML,y+8);
+  doc.setFont('Helvetica','normal');doc.text('Penn Aluminum International LLC -- Murphysboro, IL',ML+doc.getTextWidth('Facility:')+3,y+8);
+  y+=16;
+  doc.setDrawColor(...BORDER);doc.setLineWidth(0.5);doc.line(ML,y,PW-MR,y);y+=10;
 
-  // Info row
-  doc.setFont('Helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(...DGRAY);
-  doc.setFont('Helvetica','bold');doc.text('Supervisor: ',ML,y);
-  doc.setFont('Helvetica','normal');doc.text(S.supervisor,ML+doc.getTextWidth('Supervisor: '),y);
-  doc.setFont('Helvetica','bold');doc.text('Dept: ',ML+200,y);
-  doc.setFont('Helvetica','normal');doc.text(S.dept,ML+200+doc.getTextWidth('Dept: '),y);
-  doc.setFont('Helvetica','bold');doc.text('Shift: ',ML+360,y);
-  doc.setFont('Helvetica','normal');doc.text(S.shift,ML+360+doc.getTextWidth('Shift: '),y);
-  y+=7;
-  doc.setFont('Helvetica','bold');doc.text('Facility: ',ML,y);
-  doc.setFont('Helvetica','normal');doc.text('Penn Aluminum International LLC -- Murphysboro, IL',ML+doc.getTextWidth('Facility: '),y);
-  y+=12;
-  doc.setDrawColor(200,200,200);doc.setLineWidth(0.5);doc.line(ML,y,PW-MR,y);y+=10;
-
-  function sectionHeader(title){
-    checkY(20);
-    doc.setFillColor(...MBLUE2);doc.rect(ML,y-1,cW,14,'F');
-    doc.setFont('Helvetica','bold');doc.setFontSize(9);doc.setTextColor(...NAVY);
-    doc.text(title,ML+4,y+9);
-    y+=18;
-  }
-
-  function kpiRow(metrics){
-    checkY(30);
-    const cW2=cW/metrics.length;
-    // Navy bar
-    doc.setFillColor(...NAVY);doc.rect(ML,y,cW,16,'F');
-    metrics.forEach((m,i)=>{
-      doc.setFont('Helvetica','bold');doc.setFontSize(10);doc.setTextColor(...WHITE);
-      doc.text(String(m.value),ML+cW2*i+cW2/2,y+11,{align:'center'});
-    });
-    y+=16;
-    doc.setFillColor(...MBLUE2);doc.rect(ML,y,cW,12,'F');
-    metrics.forEach((m,i)=>{
-      doc.setFont('Helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(...NAVY);
-      doc.text(m.label,ML+cW2*i+cW2/2,y+8.5,{align:'center'});
-    });
-    y+=16;
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function sectionHdr(title,color){
+    color=color||NAVY;
+    checkY(22);
+    doc.setFillColor(...LBLUE);doc.rect(ML,y,cW,15,'F');
+    doc.setFont('Helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(...color);
+    doc.text(title,ML+5,y+10.5);
+    y+=19;
   }
 
-  function tableRow(cols,widths,isHeader,altRow){
-    checkY(14);
-    const rowH=13;
-    if(isHeader){doc.setFillColor(...LGRAY);doc.rect(ML,y-1,cW,rowH+1,'F');}
-    else if(altRow){doc.setFillColor(250,250,252);doc.rect(ML,y-1,cW,rowH+1,'F');}
+  function tblRow(cols,widths,isHdr,alt){
+    const rH=14;
+    checkY(rH+2);
+    if(isHdr){doc.setFillColor(...LGRAY);doc.rect(ML,y,cW,rH,'F');}
+    else if(alt){doc.setFillColor(250,252,255);doc.rect(ML,y,cW,rH,'F');}
     let x=ML;
-    cols.forEach((col,i)=>{
-      if(isHeader){doc.setFont('Helvetica','bold');doc.setFontSize(8);doc.setTextColor(...NAVY);}
+    cols.forEach((col,ci)=>{
+      const maxW=(widths[ci]||80)-6;
+      const txt=doc.splitTextToSize(String(col||'--'),maxW)[0]||'';
+      if(isHdr){doc.setFont('Helvetica','bold');doc.setFontSize(8);doc.setTextColor(...NAVY);}
       else{doc.setFont('Helvetica','normal');doc.setFontSize(8);doc.setTextColor(...DGRAY);}
-      const maxW=(widths[i]||80)-4;
-      const txt=doc.splitTextToSize(String(col||''),maxW)[0]||'';
-      doc.text(txt,x+2,y+9);
-      x+=widths[i]||80;
+      doc.text(txt,x+3,y+9.5);
+      x+=widths[ci]||80;
     });
-    doc.setDrawColor(220,220,220);doc.setLineWidth(0.3);doc.line(ML,y+rowH,ML+cW,y+rowH);
-    y+=rowH;
+    doc.setDrawColor(...BORDER);doc.setLineWidth(0.3);doc.line(ML,y+rH,ML+cW,y+rH);
+    y+=rH;
   }
 
-  function labelVal(label,val,valColor){
-    checkY(12);
+  function lv(label,val,valColor){
+    checkY(13);
     doc.setFont('Helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(...DGRAY);
-    doc.text(label+': ',ML+4,y+8);
-    doc.setFont('Helvetica','normal');
-    if(valColor)doc.setTextColor(...valColor);
+    doc.text(label+':',ML+4,y+9);
     const lw=doc.getTextWidth(label+': ');
+    doc.setFont('Helvetica','normal');
+    if(valColor)doc.setTextColor(...valColor);else doc.setTextColor(...DGRAY);
     const lines=doc.splitTextToSize(String(val||'--'),cW-lw-8);
-    doc.text(lines[0]||'',ML+4+lw,y+8);
+    doc.text(lines[0],ML+4+lw,y+9);
     doc.setTextColor(...DGRAY);
-    y+=12;
-    if(lines.length>1){
-      lines.slice(1).forEach(l=>{checkY(12);doc.setFont('Helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(80,80,80);doc.text(l,ML+4+lw,y+8);y+=12;});
-    }
+    y+=13;
+    if(lines.length>1){lines.slice(1).forEach(l=>{checkY(12);doc.setFont('Helvetica','normal');doc.setFontSize(8.5);doc.text(l,ML+4+lw,y+9);y+=12;});}
+  }
+
+  function kpiBanner(metrics){
+    checkY(32);
+    const kW=cW/metrics.length;
+    doc.setFillColor(...NAVY);doc.rect(ML,y,cW,18,'F');
+    metrics.forEach((m,i)=>{
+      doc.setFont('Helvetica','bold');doc.setFontSize(11);doc.setTextColor(...WHITE);
+      doc.text(String(m.value),ML+kW*i+kW/2,y+12,{align:'center'});
+    });
+    y+=18;
+    doc.setFillColor(...LBLUE);doc.rect(ML,y,cW,12,'F');
+    metrics.forEach((m,i)=>{
+      doc.setFont('Helvetica','normal');doc.setFontSize(7);doc.setTextColor(...NAVY);
+      doc.text(m.label,ML+kW*i+kW/2,y+8.5,{align:'center'});
+    });
+    y+=16;
   }
 
   function sp(n){y+=n||6;}
 
-  // ---- Build report ----
+  // ── Build content ──────────────────────────────────────────────────────────
   if(type==='daily'){
     const data=S.week[dayKey];
-    if(!data){doc.setFont('Helvetica','normal');doc.setFontSize(10);doc.setTextColor(150,150,150);doc.text('No data recorded for this day.',ML,y+20);
+    if(!data){
+      doc.setFont('Helvetica','italic');doc.setFontSize(11);doc.setTextColor(150,150,150);
+      doc.text('No data recorded for this day.',ML,y+20);
     }else{
-      // Attendance section
-      sectionHeader('ATTENDANCE');
-      const ec=S.employees.length;let pr=0,ab=0,lt=0,vc=0;const abn=[],ltn=[];
-      S.employees.forEach((e,i)=>{const s=data.emps[i]?.status||'present';if(s==='present')pr++;else if(s==='absent'){ab++;abn.push(e.name);}else if(s==='late'){lt++;pr++;ltn.push(e.name);}else vc++;});
-      kpiRow([{label:'Present',value:pr},{label:'Absent',value:ab},{label:'Late',value:lt},{label:'Vacation/NS',value:vc},{label:'Attendance %',value:Math.round(pr/ec*100)+'%'}]);
-      if(abn.length)labelVal('Absent',abn.join(', '),RED);
-      if(ltn.length)labelVal('Late',ltn.join(', '),AMBER);
+      // ATTENDANCE
+      const ec=S.employees.length;let pr=0,ab=0,lt=0,vc=0,ns=0;
+      const abn=[],ltn=[];
+      S.employees.forEach((e,i)=>{
+        const s=data.emps[i]?.status||'present';
+        if(s==='present')pr++;
+        else if(s==='absent'){ab++;abn.push(e.name);}
+        else if(s==='late'){lt++;pr++;ltn.push(e.name);}
+        else if(s==='vacation')vc++;
+        else if(s==='ns')ns++;
+        else pr++;
+      });
+      const scheduled=ec-ns;
+      const attPct=scheduled?Math.round(pr/scheduled*100):0;
+      sectionHdr('ATTENDANCE');
+      const aW=[cW/5,cW/5,cW/5,cW/5,cW/5];
+      tblRow(['Present','Absent','Late','Vacation','Attendance %'],aW,true);
+      tblRow([pr,ab,lt,vc,attPct+'%'],aW,false,false);
+      if(abn.length){sp(3);lv('Absent',abn.join(', '),RED);}
+      if(ltn.length){lv('Late',ltn.join(', '),AMBER);}
       sp(8);
 
-      // Production section
-      const prodData=[];
-      S.stations.forEach(st=>{const p=data.prod[st];if(!p||!p.actual)return;prodData.push(p.station=st,p);prodData[prodData.length-1].stName=st;});
-      const pRows=[];S.stations.forEach(st=>{const p=data.prod[st];if(!p||!p.actual)return;pRows.push({st,p});});
+      // PRODUCTION
+      const pRows=[];
+      S.stations.forEach(st=>{
+        const p=data.prod[st];
+        if(!p||!p.actual)return;
+        pRows.push({st,p});
+      });
       if(pRows.length){
-        sectionHeader('PRODUCTION -- Precision Drawn Aluminum Tubing (lbs)');
-        const pW=[200,90,90,130];
-        tableRow(['Station','Actual (lbs)','Goal (lbs)','Downtime'],pW,true);
-        let tp=0,tg=0,tdt=0;
+        sectionHdr('PRODUCTION -- Precision Drawn Aluminum Tubing (lbs)');
+        const pW=[175,85,85,177];
+        tblRow(['Station','Actual (lbs)','Goal (lbs)','Notes'],pW,true);
+        let tp=0,tg=0;
         pRows.forEach((row,i)=>{
-          const a=parseFloat(row.p.actual)||0,g=parseFloat(row.p.goal)||0;tp+=a;if(g)tg+=g;
-          const dts=(row.p.downtimes||[]).map(d=>{tdt+=parseInt(d.mins)||0;return d.mins+'min: '+d.cat;}).join('; ')||'None';
-          tableRow([row.st,a.toLocaleString(),g||'--',dts],pW,false,i%2===1);
+          const a=parseFloat(row.p.actual)||0,g=parseFloat(row.p.goal)||0;
+          tp+=a;if(g)tg+=g;
+          const pct=g?Math.round(a/g*100):null;
+          const note=pct!==null?pct+'% of goal':'';
+          tblRow([row.st,a.toLocaleString(),g?g.toLocaleString():'--',note],pW,false,i%2===1);
         });
-        tableRow(['TOTAL',tp.toLocaleString(),tg?tg.toLocaleString():'--',tdt?tdt+' min total':'None'],pW,true);
-        sp(8);
+        // Total row
+        doc.setFillColor(...LGRAY);doc.rect(ML,y,cW,14,'F');
+        doc.setFont('Helvetica','bold');doc.setFontSize(8);doc.setTextColor(...NAVY);
+        doc.text('TOTAL',ML+3,y+9.5);
+        doc.text(tp.toLocaleString()+' lbs',ML+pW[0]+3,y+9.5);
+        if(tg)doc.text(tg.toLocaleString(),ML+pW[0]+pW[1]+3,y+9.5);
+        if(tg)doc.text(Math.round(tp/tg*100)+'% overall',ML+pW[0]+pW[1]+pW[2]+3,y+9.5);
+        y+=18;sp(4);
       }
 
-      // Safety
-      sectionHeader('SAFETY');
-      labelVal('Pre-Shift Meeting',data.preshift?'Completed'+(data.preshiftTopic?' -- '+data.preshiftTopic:''):'Not completed',data.preshift?GREEN:RED);
-      labelVal('Days w/o Accident',String(S.accidentDays));
-      if(data.incident){labelVal('INCIDENT',data.incType+' -- '+data.incDesc,RED);labelVal('Formal Report',data.incReport);}
-      else labelVal('Incidents / Near-Miss','None reported',GREEN);
-      if(data.safetyObs)labelVal('Observations',data.safetyObs);
+      // DOWNTIME
+      const dtRows=[];let totalDT=0;
+      S.stations.forEach(st=>{
+        const p=data.prod[st];
+        if(!p||!p.actual)return; // only stations with production
+        (p.downtimes||[]).forEach(dt=>{
+          const mins=parseInt(dt.mins)||0;
+          totalDT+=mins;
+          dtRows.push({st,mins,cat:dt.cat,desc:dt.desc||''});
+        });
+      });
+      if(dtRows.length){
+        sectionHdr('DOWNTIME');
+        const dW=[160,55,100,207];
+        tblRow(['Station','Minutes','Category','Description'],dW,true);
+        dtRows.forEach((row,i)=>{
+          tblRow([row.st,row.mins,row.cat,row.desc],dW,false,i%2===1);
+        });
+        doc.setFillColor(...LGRAY);doc.rect(ML,y,cW,14,'F');
+        doc.setFont('Helvetica','bold');doc.setFontSize(8);doc.setTextColor(...NAVY);
+        doc.text('TOTAL DOWNTIME',ML+3,y+9.5);
+        doc.text(totalDT+' min ('+(Math.round(totalDT/480*100))+'% of shift)',ML+dW[0]+3,y+9.5);
+        y+=18;sp(4);
+      }
+
+      // SAFETY
+      sectionHdr('SAFETY');
+      lv('Pre-Shift Meeting',data.preshift?'Completed'+(data.preshiftTopic?' -- '+data.preshiftTopic:''):'Not completed',data.preshift?GREEN:RED);
+      lv('Days w/o Accident',String(calcAccidentDays()));
+      if(data.incident){lv('INCIDENT',data.incType+' -- '+(data.incDesc||''),RED);lv('Formal Report',data.incReport);}
+      else lv('Incidents / Near-Miss','None reported',GREEN);
+      if(data.safetyObs)lv('Observations',data.safetyObs);
       sp(8);
 
-      // Quality
-      sectionHeader('QUALITY');
+      // QUALITY
+      sectionHdr('QUALITY');
       if(data.scrap&&data.scrapEntries?.length){
-        const sW=[180,110,80,80,60];
-        tableRow(['Station','Defect','Scrap (lbs)','Pieces','Notified'],sW,true);
-        data.scrapEntries.forEach((s,i)=>tableRow([s.station,s.defect,s.lbs||0,s.pcs||0,s.notified],sW,false,i%2===1));
-        sp(4);
-        if(data.scrapEntries.some(e=>e.action)){const ac=data.scrapEntries.find(e=>e.action);labelVal('Corrective Action',ac.action);}
-      }else labelVal('Scrap / Rejects','None reported',GREEN);
+        const sW=[165,110,75,75,97];
+        tblRow(['Station','Defect','Scrap (lbs)','Pieces','Notified'],sW,true);
+        let tLbs=0,tPcs=0;
+        data.scrapEntries.forEach((s,i)=>{
+          tLbs+=parseFloat(s.lbs)||0;tPcs+=parseFloat(s.pcs)||0;
+          tblRow([s.station,s.defect,s.lbs||0,s.pcs||0,s.notified],sW,false,i%2===1);
+        });
+        doc.setFillColor(...LGRAY);doc.rect(ML,y,cW,14,'F');
+        doc.setFont('Helvetica','bold');doc.setFontSize(8);doc.setTextColor(...NAVY);
+        doc.text('TOTAL',ML+3,y+9.5);
+        doc.text(tLbs+' lbs',ML+sW[0]+sW[1]+3,y+9.5);
+        doc.text(tPcs+' pcs',ML+sW[0]+sW[1]+sW[2]+3,y+9.5);
+        y+=18;sp(4);
+        if(data.scrapEntries.some(e=>e.action)){
+          data.scrapEntries.filter(e=>e.action).forEach(e=>lv('Action ('+e.station+')',e.action));
+        }
+      }else{lv('Scrap / Rejects','None reported',GREEN);}
       sp(8);
 
-      // Personnel
+      // PERSONNEL
       if(data.coaching?.length){
-        sectionHeader('PERSONNEL CONVERSATIONS');
-        data.coaching.forEach((c,i)=>tableRow(['['+c.type+']',c.emp,c.topic],[70,130,310],false,i%2===1));
+        sectionHdr('PERSONNEL CONVERSATIONS');
+        const coW=[85,130,307];
+        tblRow(['Type','Employee','Topic/Notes'],coW,true);
+        data.coaching.forEach((c,i)=>tblRow([c.type,c.emp,c.topic],coW,false,i%2===1));
         sp(8);
       }
 
-      // Notes
-      if(data.matLow||data.handoff||data.freeNotes){
-        sectionHeader('NOTES & HANDOFF');
-        if(data.matLow)labelVal('Low Materials',data.matLow,AMBER);
-        if(data.handoff)labelVal('Handoff to Next Shift',data.handoff);
-        if(data.freeNotes)labelVal('General Notes',data.freeNotes);
-        sp(8);
+      // NOTES
+      if(data.matLow||data.handoff||data.freeNotes||data.followup){
+        sectionHdr('NOTES & HANDOFF');
+        if(data.matLow)lv('Low Materials',data.matLow,AMBER);
+        if(data.handoff)lv('Handoff to Next Shift',data.handoff);
+        if(data.followup)lv('Follow-Up',data.followup);
+        if(data.freeNotes)lv('General Notes',data.freeNotes);
       }
 
-      // Open requests
+      // OPEN REQUESTS
       const oR=S.repairs.filter(r=>!r.resolved);
       if(oR.length){
-        sectionHeader('OPEN REQUESTS');
-        const rW=[180,220,80,30];
-        tableRow(['Equipment / Item','Description','Priority','Cat.'],rW,true);
-        oR.forEach((r,i)=>tableRow([r.equip,r.desc,r.priority.toUpperCase(),r.cat||''],rW,false,i%2===1));
-        sp(8);
+        sp(4);sectionHdr('OPEN REQUESTS');
+        const rW=[160,220,90,52];
+        tblRow(['Equipment/Item','Description','Priority','Category'],rW,true);
+        oR.forEach((r,i)=>tblRow([r.equip,r.desc,r.priority.toUpperCase(),r.cat||''],rW,false,i%2===1));
       }
     }
-  }else{
-    // Weekly
-    const days2=weekDays();
-    // KPI summary
-    let wP=0,wS=0,wDt=0,wI=0,wPres=0,wEmp=0;
-    days2.forEach(d=>{const dd=S.week[ds(d)];if(!dd)return;Object.values(dd.prod||{}).forEach(p=>{wP+=parseFloat(p.actual)||0;(p.downtimes||[]).forEach(dt=>wDt+=parseInt(dt.mins)||0);});(dd.scrapEntries||[]).forEach(e=>wS+=parseFloat(e.lbs)||0);if(dd.incident)wI++;const ec=S.employees.length;wEmp+=ec;Object.values(dd.emps||{}).forEach(e=>{if(e.status==='present'||e.status==='late')wPres++;});});
-    sp(4);
-    kpiRow([{label:'Total Production',value:wP.toLocaleString()+' lbs'},{label:'Avg Attendance',value:wEmp?Math.round(wPres/wEmp*100)+'%':'--'},{label:'Total Scrap',value:wS+' lbs'},{label:'Total Downtime',value:wDt+' min'},{label:'Incidents',value:wI},{label:'Days w/o Accident',value:S.accidentDays}]);
-    sp(10);
 
-    // Per-day summary
-    days2.forEach(d=>{
+  }else{
+    // ── WEEKLY ──────────────────────────────────────────────────────────────
+    const selDays=getSelectedWeekDays();
+    let wP=0,wS=0,wDt=0,wI=0,wPres=0,wEmp=0;
+    selDays.forEach(d=>{
+      const dd=S.week[ds(d)];if(!dd)return;
+      Object.values(dd.prod||{}).forEach(p=>{
+        if(!p.actual)return;
+        wP+=parseFloat(p.actual)||0;
+        (p.downtimes||[]).forEach(dt=>wDt+=parseInt(dt.mins)||0);
+      });
+      (dd.scrapEntries||[]).forEach(e=>wS+=parseFloat(e.lbs)||0);
+      if(dd.incident)wI++;
+      const ec=S.employees.length;wEmp+=ec;
+      Object.values(dd.emps||{}).forEach(e=>{if(e.status==='present'||e.status==='late')wPres++;});
+    });
+    sp(4);
+    kpiBanner([
+      {label:'Total Production',value:wP.toLocaleString()+' lbs'},
+      {label:'Avg Attendance',value:wEmp?Math.round(wPres/wEmp*100)+'%':'--'},
+      {label:'Total Scrap',value:wS+' lbs'},
+      {label:'Total Downtime',value:wDt+' min'},
+      {label:'Incidents',value:wI},
+      {label:'Days w/o Accident',value:calcAccidentDays()}
+    ]);
+    sp(8);
+
+    selDays.forEach(d=>{
       const d_=ds(d),data=S.week[d_];
-      checkY(60);
-      // Day header
+      checkY(30);
       doc.setFillColor(...NAVY);doc.rect(ML,y,cW,14,'F');
       doc.setFont('Helvetica','bold');doc.setFontSize(9);doc.setTextColor(...WHITE);
       doc.text(DN[d.getDay()].toUpperCase()+' '+MN[d.getMonth()]+' '+d.getDate(),ML+4,y+10);
       y+=18;
-      if(!data){doc.setFont('Helvetica','italic');doc.setFontSize(8.5);doc.setTextColor(150,150,150);doc.text('No data recorded.',ML+4,y+8);y+=14;sp(4);return;}
-
-      const ec=S.employees.length;let pr=0,ab=0,lt=0;const abn=[],ltn=[];
-      S.employees.forEach((e,i)=>{const s=data.emps[i]?.status||'present';if(s==='present')pr++;else if(s==='absent'){ab++;abn.push(e.name);}else if(s==='late'){lt++;pr++;ltn.push(e.name);}});
-      labelVal('Attendance',pr+'/'+ec+' ('+(Math.round(pr/ec*100))+'%)'+(abn.length?' | Absent: '+abn.join(', '):'')+(ltn.length?' | Late: '+ltn.join(', '):''));
-
-      let dp=0,dg=0,ddt=0;S.stations.forEach(st=>{const p=data.prod[st];if(!p||!p.actual)return;const a=parseFloat(p.actual)||0,g=parseFloat(p.goal)||0;dp+=a;if(g)dg+=g;(p.downtimes||[]).forEach(dt=>ddt+=parseInt(dt.mins)||0);});
-      labelVal('Production',dp.toLocaleString()+' lbs'+(dg?' / goal '+dg.toLocaleString()+' lbs ('+Math.round(dp/dg*100)+'%)':'')+(ddt?' | Downtime: '+ddt+' min':''));
-      labelVal('Safety',(data.preshift?'Pre-shift: Done':'Pre-shift: Missed')+(data.preshiftTopic?' ('+data.preshiftTopic+')':'')+(data.incident?' | INCIDENT: '+data.incType:''));
-      if(data.scrap&&data.scrapEntries?.length){let tl=0;data.scrapEntries.forEach(e=>tl+=parseFloat(e.lbs)||0);labelVal('Quality','Scrap: '+tl+' lbs',AMBER);}
-      else labelVal('Quality','No scrap reported',GREEN);
-      if(data.coaching?.length)data.coaching.forEach(c=>labelVal('  ['+c.type+']',c.emp+': '+c.topic));
-      if(data.freeNotes)labelVal('Notes',data.freeNotes);
-      sp(6);
-      doc.setDrawColor(200,200,200);doc.setLineWidth(0.3);doc.line(ML,y,ML+cW,y);y+=6;
+      if(!data){
+        doc.setFont('Helvetica','italic');doc.setFontSize(8.5);doc.setTextColor(150,150,150);
+        doc.text('No data recorded.',ML+4,y+8);y+=14;sp(4);return;
+      }
+      const ec=S.employees.length;let pr=0,ab=0,lt=0,ns=0;const abn=[],ltn=[];
+      S.employees.forEach((e,i)=>{
+        const s=data.emps[i]?.status||'present';
+        if(s==='present')pr++;else if(s==='absent'){ab++;abn.push(e.name);}
+        else if(s==='late'){lt++;pr++;ltn.push(e.name);}else if(s==='ns')ns++;
+        else pr++;
+      });
+      const scheduled=ec-ns;
+      lv('Attendance',pr+'/'+(scheduled)+' ('+(scheduled?Math.round(pr/scheduled*100):0)+'%)'+(abn.length?' | Absent: '+abn.join(', '):'')+(ltn.length?' | Late: '+ltn.join(', '):''));
+      let dp=0,dg=0,ddt=0;
+      S.stations.forEach(st=>{
+        const p=data.prod[st];if(!p||!p.actual)return;
+        const a=parseFloat(p.actual)||0,g=parseFloat(p.goal)||0;dp+=a;if(g)dg+=g;
+        (p.downtimes||[]).forEach(dt=>ddt+=parseInt(dt.mins)||0);
+      });
+      lv('Production',dp.toLocaleString()+' lbs'+(dg?' / goal '+dg.toLocaleString()+' lbs ('+Math.round(dp/dg*100)+'%)':'')+(ddt?' | Downtime: '+ddt+' min':''));
+      lv('Safety',(data.preshift?'Pre-shift done':'Pre-shift missed')+(data.preshiftTopic?' ('+data.preshiftTopic+')':'')+(data.incident?' | INCIDENT: '+data.incType:''));
+      if(data.scrap&&data.scrapEntries?.length){
+        let tl=0;data.scrapEntries.forEach(e=>tl+=parseFloat(e.lbs)||0);
+        lv('Quality','Scrap: '+tl+' lbs',AMBER);
+      }else lv('Quality','No scrap reported',GREEN);
+      if(data.coaching?.length)data.coaching.forEach(c=>lv('  ['+c.type+']',c.emp+': '+c.topic));
+      if(data.freeNotes)lv('Notes',data.freeNotes);
+      sp(5);
+      doc.setDrawColor(...BORDER);doc.setLineWidth(0.3);doc.line(ML,y,ML+cW,y);y+=8;
     });
 
-    // Open requests
     const oR=S.repairs.filter(r=>!r.resolved);
-    if(oR.length){sp(6);sectionHeader('OPEN REQUESTS');const rW=[170,250,90];tableRow(['Equipment / Item','Description','Priority'],rW,true);oR.forEach((r,i)=>tableRow([r.equip,r.desc,r.priority.toUpperCase()],rW,false,i%2===1));}
-
-    // Pending todos
+    if(oR.length){
+      sp(4);sectionHdr('OPEN REQUESTS');
+      const rW=[160,250,112];
+      tblRow(['Equipment/Item','Description','Priority'],rW,true);
+      oR.forEach((r,i)=>tblRow([r.equip,r.desc,r.priority.toUpperCase()],rW,false,i%2===1));
+    }
     const pT=S.todos.filter(t=>!t.done);
-    if(pT.length){sp(8);sectionHeader('PENDING ACTION ITEMS');const tW=[240,140,130];tableRow(['Task','Priority','Assigned To'],tW,true);pT.forEach((t,i)=>tableRow([t.text,t.priority.toUpperCase(),t.assign],tW,false,i%2===1));}
+    if(pT.length){
+      sp(8);sectionHdr('PENDING ACTION ITEMS');
+      const tW=[240,100,182];
+      tblRow(['Task','Priority','Assigned To'],tW,true);
+      pT.forEach((t,i)=>tblRow([t.text,t.priority.toUpperCase(),t.assign],tW,false,i%2===1));
+    }
   }
 
-  // Footer on each page
+  // ── Footer on all pages ────────────────────────────────────────────────────
   const totalPages=doc.getNumberOfPages();
   for(let p=1;p<=totalPages;p++){
     doc.setPage(p);
-    doc.setDrawColor(200,200,200);doc.setLineWidth(0.5);doc.line(ML,PH-30,PW-MR,PH-30);
+    doc.setDrawColor(...BORDER);doc.setLineWidth(0.5);doc.line(ML,PH-28,PW-MR,PH-28);
     doc.setFont('Helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(150,150,150);
-    doc.text('Penn Aluminum International LLC  |  Murphysboro, IL  |  Marmon Holdings / Berkshire Hathaway',ML,PH-18);
-    doc.text('Page '+p+' of '+totalPages,PW-MR,PH-18,{align:'right'});
-    doc.text('Supervisor: '+S.supervisor,PW/2,PH-18,{align:'center'});
+    doc.text('Penn Aluminum International LLC  |  Murphysboro, IL  |  Marmon Holdings / Berkshire Hathaway',ML,PH-16);
+    doc.text('Supervisor: '+S.supervisor+'  |  Page '+p+' of '+totalPages,PW-MR,PH-16,{align:'right'});
   }
 
   const wd2=weekDays();
-  doc.save(type==='weekly'?'PennAluminum_Weekly_'+ds(wd2[0])+'.pdf':'PennAluminum_Daily_'+dayKey+'.pdf');
+  const selD=getSelectedWeekDays();
+  doc.save(type==='weekly'?'PennAluminum_Weekly_'+ds(selD[0])+'.pdf':'PennAluminum_Daily_'+dayKey+'.pdf');
 }
 
 function exportWordReport(){
@@ -1386,7 +1486,12 @@ function importFloorLog(event){
     if(!payload.entries||!payload.date){alert('Invalid floor log file format.');return;}
     const data=ensureDay(payload.date||activeDay);
     let dtCount=0,noteCount=0,coachCount=0,safetyCount=0;
+    // Track already imported entry IDs to avoid duplicates
+    if(!data.importedIds)data.importedIds=[];
     payload.entries.forEach(function(entry){
+      // Skip if already imported
+      if(data.importedIds.indexOf(entry.id)!==-1)return;
+      data.importedIds.push(entry.id);
       if(entry.type==='downtime'){
         const st=entry.station;
         if(!data.prod[st])data.prod[st]={actual:'',goal:'',downtimes:[]};
