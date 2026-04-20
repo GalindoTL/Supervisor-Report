@@ -1217,12 +1217,15 @@ function exportPDF(){
         y+=18;sp(4);
       }
 
-      // DOWNTIME
+      // DOWNTIME - show non-break DT for all stations, breaks only for stations with production
       const dtRows=[];let totalDT=0;
       S.stations.forEach(st=>{
         const p=data.prod[st];
-        if(!p||!p.actual)return; // only stations with production
-        (p.downtimes||[]).forEach(dt=>{
+        const hasProduction=p&&parseFloat(p.actual||0)>0;
+        (p?.downtimes||[]).forEach(dt=>{
+          const isBreak=dt.cat==='Break';
+          // Skip breaks if no production on this station
+          if(isBreak&&!hasProduction)return;
           const mins=parseInt(dt.mins)||0;
           totalDT+=mins;
           dtRows.push({st,mins,cat:dt.cat,desc:dt.desc||''});
@@ -1307,10 +1310,14 @@ function exportPDF(){
     let wP=0,wS=0,wDt=0,wI=0,wPres=0,wEmp=0;
     selDays.forEach(d=>{
       const dd=S.week[ds(d)];if(!dd)return;
-      Object.values(dd.prod||{}).forEach(p=>{
-        if(!p.actual)return;
+      Object.values(dd.prod||{}).forEach((p,idx)=>{
+        const hasProduction=parseFloat(p.actual||0)>0;
         wP+=parseFloat(p.actual)||0;
-        (p.downtimes||[]).forEach(dt=>wDt+=parseInt(dt.mins)||0);
+        (p.downtimes||[]).forEach(dt=>{
+          const isBreak=dt.cat==='Break';
+          if(isBreak&&!hasProduction)return; // skip breaks with no production
+          wDt+=parseInt(dt.mins)||0;
+        });
       });
       (dd.scrapEntries||[]).forEach(e=>wS+=parseFloat(e.lbs)||0);
       if(dd.incident)wI++;
