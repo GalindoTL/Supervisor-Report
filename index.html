@@ -629,6 +629,7 @@ function loadDay(){
     renderDTList(i,pd.downtimes||[]);updateProdBar(i);
   });
   updateProdTotals();
+  addDefaultBreaksToAllStations();
   setTgl('preshift',data.preshift);setTgl('incident',data.incident);setTgl('scrap',data.scrap);
   sv_('preshift-topic',data.preshiftTopic);sv_('inc-type',data.incType,'Near-Miss');
   sv_('inc-report',data.incReport,'Yes');sv_('inc-desc',data.incDesc);sv_('safety-obs',data.safetyObs);
@@ -1070,20 +1071,18 @@ function exportPDF(){
   y+=38;
   doc.setDrawColor(...NAVY);doc.setLineWidth(1.5);doc.line(ML,y,PW-MR,y);y+=6;
 
-  // Supervisor info row
+  // Supervisor info row - use fixed column positions
   doc.setFontSize(8.5);doc.setTextColor(...DGRAY);
-  const infoItems=[
-    ['Supervisor:',S.supervisor],['Dept:',S.dept],['Shift:',S.shift]
-  ];
-  let ix=ML;
-  infoItems.forEach(([lbl,val])=>{
-    doc.setFont('Helvetica','bold');doc.text(lbl,ix,y+8);
-    doc.setFont('Helvetica','normal');doc.text(val,ix+doc.getTextWidth(lbl)+3,y+8);
-    ix+=Math.max(doc.getTextWidth(lbl+val)+20,140);
-  });
-  y+=14;
-  doc.setFont('Helvetica','bold');doc.text('Facility:',ML,y+8);
-  doc.setFont('Helvetica','normal');doc.text('Penn Aluminum International LLC -- Murphysboro, IL',ML+doc.getTextWidth('Facility:')+3,y+8);
+  const col1=ML, col2=ML+175, col3=ML+380;
+  doc.setFont('Helvetica','bold');doc.text('Supervisor:',col1,y+8);
+  doc.setFont('Helvetica','normal');doc.text(S.supervisor,col1+58,y+8);
+  doc.setFont('Helvetica','bold');doc.text('Dept:',col2,y+8);
+  doc.setFont('Helvetica','normal');doc.text(S.dept,col2+30,y+8);
+  doc.setFont('Helvetica','bold');doc.text('Shift:',col3,y+8);
+  doc.setFont('Helvetica','normal');doc.text(S.shift,col3+28,y+8);
+  y+=13;
+  doc.setFont('Helvetica','bold');doc.text('Facility:',col1,y+8);
+  doc.setFont('Helvetica','normal');doc.text('Penn Aluminum International LLC -- Murphysboro, IL',col1+42,y+8);
   y+=16;
   doc.setDrawColor(...BORDER);doc.setLineWidth(0.5);doc.line(ML,y,PW-MR,y);y+=10;
 
@@ -1116,17 +1115,20 @@ function exportPDF(){
   }
 
   function lv(label,val,valColor){
-    checkY(13);
+    checkY(14);
+    const labelW=90; // fixed label column width
     doc.setFont('Helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(...DGRAY);
     doc.text(label+':',ML+4,y+9);
-    const lw=doc.getTextWidth(label+': ');
     doc.setFont('Helvetica','normal');
     if(valColor)doc.setTextColor(...valColor);else doc.setTextColor(...DGRAY);
-    const lines=doc.splitTextToSize(String(val||'--'),cW-lw-8);
-    doc.text(lines[0],ML+4+lw,y+9);
+    const maxValW=cW-labelW-8;
+    const lines=doc.splitTextToSize(String(val||'--'),maxValW);
+    lines.forEach((line,li)=>{
+      if(li>0)checkY(12);
+      doc.text(line,ML+4+labelW,y+9+(li===0?0:12*li));
+    });
     doc.setTextColor(...DGRAY);
-    y+=13;
-    if(lines.length>1){lines.slice(1).forEach(l=>{checkY(12);doc.setFont('Helvetica','normal');doc.setFontSize(8.5);doc.text(l,ML+4+lw,y+9);y+=12;});}
+    y+=14+(lines.length>1?(lines.length-1)*12:0);
   }
 
   function kpiBanner(metrics){
@@ -1171,10 +1173,20 @@ function exportPDF(){
       const attPct=scheduled?Math.round(pr/scheduled*100):0;
       sectionHdr('ATTENDANCE');
       const aW=[cW/5,cW/5,cW/5,cW/5,cW/5];
-      tblRow(['Present','Absent','Late','Vacation','Attendance %'],aW,true);
-      tblRow([pr,ab,lt,vc,attPct+'%'],aW,false,false);
-      if(abn.length){sp(3);lv('Absent',abn.join(', '),RED);}
-      if(ltn.length){lv('Late',ltn.join(', '),AMBER);}
+      tblRow(['Present','Absent','Late','Vacation/NS','Attendance %'],aW,true);
+      tblRow([pr+'/'+scheduled,ab,lt,vc+ns,attPct+'%'],aW,false,false);
+      sp(3);
+      if(abn.length)lv('Absent',abn.join(', '),RED);
+      if(ltn.length)lv('Late',ltn.join(', '),AMBER);
+      // Show vacation/ns names too
+      const vcNames=[],nsNames=[];
+      S.employees.forEach((e,i)=>{
+        const s=data.emps[i]?.status||'present';
+        if(s==='vacation')vcNames.push(e.name);
+        if(s==='ns')nsNames.push(e.name);
+      });
+      if(vcNames.length)lv('Vacation',vcNames.join(', '),[80,80,150]);
+      if(nsNames.length)lv('Not Scheduled',nsNames.join(', '),[100,100,100]);
       sp(8);
 
       // PRODUCTION
