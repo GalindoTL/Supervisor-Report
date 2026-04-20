@@ -574,7 +574,10 @@ function buildSidebar(){
     const btn=document.createElement('button');
     btn.className='day-btn'+(d_===activeDay?' active':'')+(hasData?' has-data':'');
     btn.innerHTML='<span>'+DN[d.getDay()]+' '+d.getDate()+'</span><span class="ddot"></span>';
-    btn.onclick=()=>{activeDay=d_;buildSidebar();showPage('daily');showTab('att',document.querySelector('.tab'));};
+    btn.onclick=()=>{
+      if(currentPage==='daily'){collectDay();persist();}
+      activeDay=d_;buildSidebar();showPage('daily');showTab('att',document.querySelector('.tab'));
+    };
     c.appendChild(btn);
   });
   const dd=document.getElementById('dash-date');
@@ -584,6 +587,8 @@ function buildSidebar(){
 
 // -- Pages ---------------------------------------------------------------------
 function showPage(p){
+  // Auto-save daily log before navigating away
+  if(currentPage==='daily'&&p!=='daily'){collectDay();persist();}
   currentPage=p;
   document.querySelectorAll('[id^="page-"]').forEach(el=>el.classList.add('hidden'));
   document.getElementById('page-'+p).classList.remove('hidden');
@@ -868,7 +873,10 @@ function updateDashboard(){
     const d_=ds(d),data=S.week[d_],isToday=d_===ds(today);
     const dotCol=data?.closed?'var(--gn)':data?'var(--am)':isToday?'var(--ac)':'var(--bd)';
     const cell=document.createElement('div');cell.className='wc';
-    cell.onclick=()=>{showDayDetail(d_);};
+    cell.onclick=()=>{
+      if(currentPage==='daily'){collectDay();persist();}
+      showDayDetail(d_);
+    };
     cell.innerHTML='<div class="wcn">'+DN[d.getDay()]+'</div><div class="wcd" style="background:'+dotCol+'"></div><div class="wcs">'+(data?.closed?'✓':data?'~':isToday?'now':'--')+'</div>';
     cells.appendChild(cell);
     if(data){
