@@ -549,7 +549,21 @@ const MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec
 
 // -- Storage -------------------------------------------------------------------
 function persist(){localStorage.setItem('penn_v3',JSON.stringify(S));setSaved();}
-function load(){const s=localStorage.getItem('penn_v3');if(s){try{S=JSON.parse(s);}catch(e){}}if(!S.todos)S.todos=[];if(!S.repairs)S.repairs=[];if(!S.week)S.week=[];}
+function load(){const s=localStorage.getItem('penn_v3');if(s){try{S=JSON.parse(s);}catch(e){}}
+  if(!S.todos)S.todos=[];if(!S.repairs)S.repairs=[];if(!S.week)S.week=[];
+  // Always ensure permanent daily tasks exist
+  if(!S.dailyTasks)S.dailyTasks=[];
+  const PERM_TASKS=[
+    {id:1,text:'Fill SharePoint Report',permanent:true,notifTime:'',mondayOnly:false},
+    {id:2,text:'Check ADP Hours / Vacations',permanent:true,notifTime:'',mondayOnly:false},
+    {id:3,text:'Send previous week report (Mondays)',permanent:true,notifTime:'',mondayOnly:true},
+    {id:4,text:'First Articles check',permanent:true,notifTime:'',mondayOnly:false}
+  ];
+  PERM_TASKS.forEach(function(pt){
+    const exists=S.dailyTasks.some(function(t){return t.id===pt.id;});
+    if(!exists)S.dailyTasks.unshift(Object.assign({done:{}},pt));
+  });
+}
 function setSaved(){unsaved=false;document.getElementById('sv-dot').classList.remove('unsaved');document.getElementById('sv-txt').textContent='Saved';}
 function mu(){unsaved=true;document.getElementById('sv-dot').classList.add('unsaved');document.getElementById('sv-txt').textContent='Unsaved';}
 
@@ -627,11 +641,14 @@ function loadDay(){
     const ni=card.querySelector('.enote input');if(ni)ni.value=note;
   });
   updateAttMetrics();
+  // Rebuild prod list first (adds breaks if missing, renders DT lists)
+  buildProdList();
+  // Then load values
   S.stations.forEach((st,i)=>{
     const pd=data.prod[st]||{actual:'',goal:'',downtimes:[]};
     const ae=document.getElementById('pa-'+i),ge=document.getElementById('pg-'+i);
     if(ae)ae.value=pd.actual||'';if(ge)ge.value=pd.goal||'';
-    renderDTList(i,pd.downtimes||[]);updateProdBar(i);
+    updateProdBar(i);
   });
   updateProdTotals();
   setTgl('preshift',data.preshift);setTgl('incident',data.incident);setTgl('scrap',data.scrap);
