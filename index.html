@@ -629,7 +629,6 @@ function loadDay(){
     renderDTList(i,pd.downtimes||[]);updateProdBar(i);
   });
   updateProdTotals();
-  addDefaultBreaksToAllStations();
   setTgl('preshift',data.preshift);setTgl('incident',data.incident);setTgl('scrap',data.scrap);
   sv_('preshift-topic',data.preshiftTopic);sv_('inc-type',data.incType,'Near-Miss');
   sv_('inc-report',data.incReport,'Yes');sv_('inc-desc',data.incDesc);sv_('safety-obs',data.safetyObs);
