@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Penn Aluminum -- Supervisor Log</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -142,6 +145,7 @@ select option{background:var(--bg3)}
     <div class="logo-dept">Tube Mill Department</div>
     <div class="logo-badge" id="sb-supervisor">Luis Galindo</div>
     <div class="logo-sub">Murphysboro, IL · Marmon / Berkshire Hathaway</div>
+    <div class="logo-sub" style="color:var(--ac);margin-top:2px">v2.5 · Apr 2026</div>
   </div>
   <div class="week-nav">
     <div class="slbl">This Week</div>
@@ -373,16 +377,21 @@ select option{background:var(--bg3)}
       <div class="fgrp"><label>Facility</label><input type="text" id="set-fac" oninput="saveSettings()"></div>
     </div>
   </div>
-  <div class="stblk">
-    <div class="slbl" style="margin-bottom:10px">Stations / Work Areas</div>
-    <div id="st-settings"></div>
-    <button class="badd" onclick="openModal('station-settings')">+ Add Station</button>
-  </div>
+  
   <div class="stblk">
     <div class="slbl" style="margin-bottom:10px">Employees</div>
     <div id="emp-settings"></div>
     <button class="badd" onclick="openModal('employee')">+ Add Employee</button>
   </div>
+  <div class="stblk">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="slbl" style="margin:0">Stations / Work Areas</div>
+      <span style="font-size:11px;color:var(--tx3)">Drag to reorder · Click name to edit</span>
+    </div>
+    <div id="st-settings"></div>
+    <button class="badd" onclick="openModal('station-settings')">+ Add Station</button>
+  </div>
+
   <div class="stblk" id="daily-tasks-settings">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <div class="slbl" style="margin:0">Daily Tasks</div>
@@ -527,6 +536,11 @@ const DEF_EMP=[
   {name:"Yvette James",station:"COIL PACKING"}
 ];
 const AVC=[{bg:"#1a3a7a",fg:"#4f8ef7"},{bg:"#0d4a2e",fg:"#2ecc8a"},{bg:"#4a3200",fg:"#f5a623"},{bg:"#4a1515",fg:"#e05252"},{bg:"#2a1a5a",fg:"#9b6dff"},{bg:"#0d3a3a",fg:"#2eccc4"}];
+const BREAKS=[
+  {mins:15,cat:"Break",desc:"Morning break 9:00 AM"},
+  {mins:20,cat:"Break",desc:"Lunch break 11:00 AM"},
+  {mins:15,cat:"Break",desc:"Afternoon break 1:00 PM"}
+];
 
 // -- State ---------------------------------------------------------------------
 let S={stations:[...DEF_ST],employees:JSON.parse(JSON.stringify(DEF_EMP)),accidentDays:0,supervisor:"Luis Galindo",dept:"Tube Mill Department",facility:"Penn Aluminum International LLC -- Murphysboro, IL",shift:"Day Shift",week:{},todos:[],repairs:[]};
@@ -579,6 +593,18 @@ if(lastDate&&lastDate!==ds(today))S.todos.forEach(t=>{if(!t.done)t.carried=true;
 localStorage.setItem('penn_last',ds(today));
 buildSidebar();buildEmpGrid();buildProdList();buildSettings();populateRptDays();updateDashboard();showPage('dashboard');
 setInterval(()=>{if(unsaved&&currentPage==='daily'){collectDay();persist();}},60000);
+// Force render breaks after everything is ready
+setTimeout(function(){
+  if(currentPage==='daily'){
+    ensureBreaks();
+    localStorage.setItem('penn_v3',JSON.stringify(S));
+    S.stations.forEach(function(st,i){
+      var pd=ensureDay(activeDay).prod[st]||{actual:'',goal:'',downtimes:[]};
+      renderDTList(i,pd.downtimes||[]);
+    });
+    updateProdTotals();
+  }
+},300);
 
 // -- Sidebar -------------------------------------------------------------------
 function buildSidebar(){
@@ -622,6 +648,16 @@ function showTab(t,btn){
   document.getElementById('tab-'+t).classList.remove('hidden');
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
+  // When switching to Production, re-render all DT lists to show breaks
+  if(t==='prod'){
+    ensureBreaks();
+    localStorage.setItem('penn_v3',JSON.stringify(S));
+    S.stations.forEach(function(st,i){
+      var pd=ensureDay(activeDay).prod[st]||{actual:'',goal:'',downtimes:[]};
+      renderDTList(i,pd.downtimes||[]);
+    });
+    updateProdTotals();
+  }
 }
 
 // -- Daily ---------------------------------------------------------------------
@@ -641,13 +677,18 @@ function loadDay(){
     const ni=card.querySelector('.enote input');if(ni)ni.value=note;
   });
   updateAttMetrics();
-  // Rebuild prod list first (adds breaks if missing, renders DT lists)
+  // Build HTML structure
   buildProdList();
-  // Then load values
+  // Add breaks to data (modifies S.week but doesn't save yet)
+  ensureBreaks();
+  // Save breaks immediately so they persist across tab switches
+  localStorage.setItem('penn_v3',JSON.stringify(S));
+  // Fill values and render DT lists from now-complete data
   S.stations.forEach((st,i)=>{
-    const pd=data.prod[st]||{actual:'',goal:'',downtimes:[]};
+    const pd=ensureDay(activeDay).prod[st]||{actual:'',goal:'',downtimes:[]};
     const ae=document.getElementById('pa-'+i),ge=document.getElementById('pg-'+i);
     if(ae)ae.value=pd.actual||'';if(ge)ge.value=pd.goal||'';
+    renderDTList(i,pd.downtimes||[]);
     updateProdBar(i);
   });
   updateProdTotals();
@@ -724,6 +765,21 @@ function updateAttMetrics(){
 }
 
 // -- Production ----------------------------------------------------------------
+const NO_BREAK_STATIONS=['C/O SAW 1','C/O SAW 2','OVEN 5','3150 PRESS OPERATOR'];
+
+function ensureBreaks(){
+  var data=ensureDay(activeDay);
+  S.stations.forEach(function(st){
+    if(!data.prod[st])data.prod[st]={actual:'',goal:'',downtimes:[]};
+    if(!data.prod[st].downtimes)data.prod[st].downtimes=[];
+    if(NO_BREAK_STATIONS.indexOf(st)>=0)return;
+    var hasBreaks=data.prod[st].downtimes.some(function(d){return d.cat==='Break';});
+    if(!hasBreaks){
+      BREAKS.forEach(function(b){data.prod[st].downtimes.push({mins:b.mins,cat:b.cat,desc:b.desc});});
+    }
+  });
+}
+
 function buildProdList(){
   const list=document.getElementById('prod-list');if(!list)return;list.innerHTML='';
   S.stations.forEach((st,i)=>{
@@ -1430,27 +1486,190 @@ function exportPDF(){
 }
 
 function exportWordReport(){
-  // Build the report data object from current state
-  const days=weekDays();
-  const daysData=days.map(d=>{
-    const d_=ds(d),data=S.week[d_];
-    if(!data)return{label:DN[d.getDay()]+' '+MN[d.getMonth()]+' '+d.getDate(),hasData:false};
-    const ec=S.employees.length;let pr=0,ab=0,lt=0,vc=0;const abn=[],ltn=[];
-    S.employees.forEach((e,i)=>{const s=data.emps[i]?.status||'present';if(s==='present')pr++;else if(s==='absent'){ab++;abn.push(e.name);}else if(s==='late'){lt++;pr++;ltn.push(e.name);}else vc++;});
-    const prod=[];
-    S.stations.forEach(st=>{const p=data.prod[st];if(!p||!p.actual)return;prod.push({station:st,actual:parseFloat(p.actual)||0,goal:parseFloat(p.goal)||0,downtimes:p.downtimes||[]});});
-    return{label:DN[d.getDay()]+' '+MN[d.getMonth()]+' '+d.getDate(),hasData:true,att:{present:pr,absent:ab,late:lt,vac:vc,pct:Math.round(pr/ec*100)+'%',absentNames:abn,lateNames:ltn},production:prod,safety:{preshift:data.preshift,topic:data.preshiftTopic,incident:data.incident,incType:data.incType,incDesc:data.incDesc,incReport:data.incReport,obs:data.safetyObs},scrapEntries:data.scrapEntries||[],coaching:data.coaching||[],notes:{materialsLow:data.matLow,handoff:data.handoff,freeNotes:data.freeNotes}};
-  });
-  let wP=0,wS=0,wDt=0,wI=0,wPres=0,wEmp=0;
-  daysData.forEach(d=>{if(!d.hasData)return;d.production?.forEach(p=>{wP+=p.actual;p.downtimes?.forEach(dt=>wDt+=parseInt(dt.mins)||0);});d.att&&(wPres+=d.att.present,wEmp+=S.employees.length);(d.scrapEntries||[]).forEach(e=>wS+=parseFloat(e.lbs)||0);if(d.safety?.incident)wI++;});
-  const reportPayload={supervisor:S.supervisor,dept:S.dept,shift:S.shift,weekStart:MN[days[0].getMonth()]+' '+days[0].getDate()+', '+days[0].getFullYear(),weekEnd:MN[days[4].getMonth()]+' '+days[4].getDate()+', '+days[4].getFullYear(),days:daysData,accidentDays:S.accidentDays,weeklyTotals:{prod:wP,att:wEmp?Math.round(wPres/wEmp*100)+'%':'--',scrap:wS,downtime:wDt,incidents:wI},openRequests:S.repairs.filter(r=>!r.resolved),pendingTodos:S.todos.filter(t=>!t.done)};
-  // Download as JSON for Word generation - instruct user
-  const json=JSON.stringify(reportPayload);
-  const blob=new Blob([json],{type:'application/json'});
+  const type=gv_('report-type');
+  const selDays=type==='weekly'?getSelectedWeekDays():weekDays();
+  const dayKey=gv_('rpt-day');
+
+  // Build clean HTML styled for Word
+  const css=`
+    body{font-family:Arial,sans-serif;font-size:10pt;margin:0;color:#111}
+    h1{font-size:15pt;color:#0D2D5E;margin:0 0 4pt 0;font-weight:bold}
+    .sub{font-size:9pt;color:#555;border-bottom:2pt solid #0D2D5E;padding-bottom:4pt;margin-bottom:10pt}
+    h2{font-size:10pt;color:#fff;background:#0D2D5E;padding:4pt 6pt;margin:14pt 0 4pt 0;font-weight:bold}
+    h3{font-size:9.5pt;color:#0D2D5E;background:#D6E4F7;padding:3pt 5pt;margin:8pt 0 3pt 0;font-weight:bold}
+    table{border-collapse:collapse;width:100%;margin-bottom:6pt;font-size:9pt}
+    th{background:#0D2D5E;color:#fff;padding:3pt 5pt;text-align:left;font-weight:bold;font-size:8.5pt}
+    td{padding:3pt 5pt;border-bottom:1pt solid #dde3ed}
+    tr:nth-child(even) td{background:#f5f8fc}
+    .tot td{background:#D6E4F7;font-weight:bold;color:#0D2D5E}
+    p{margin:2pt 0;font-size:9.5pt}
+    .lbl{font-weight:bold;color:#333}
+    .red{color:#C0392B}.green{color:#1A5C3A}.amber{color:#7D4E00}
+    .kpi{width:100%;border-collapse:collapse;margin-bottom:10pt}
+    .kpi th{background:#0D2D5E;color:#fff;text-align:center;font-size:13pt;padding:6pt;font-weight:bold}
+    .kpi td{background:#D6E4F7;text-align:center;font-size:8pt;color:#0D2D5E;padding:3pt;font-weight:bold}
+    .footer{font-size:8pt;color:#999;border-top:1pt solid #ccc;padding-top:5pt;margin-top:20pt}
+  `;
+
+  function row(cells,isHdr,isTot){
+    let r=isHdr?'<tr>':'<tr>';
+    cells.forEach(c=>{
+      if(isHdr)r+='<th>'+c+'</th>';
+      else r+='<td>'+c+'</td>';
+    });
+    return r+'</tr>';
+  }
+
+  function tbl(headers,rows){
+    let t='<table><thead>'+row(headers,true)+'</thead><tbody>';
+    rows.forEach((r,i)=>{t+='<tr>';r.forEach(c=>{t+='<td>'+(c===null||c===undefined?'':c)+'</td>';});t+='</tr>';});
+    t+='</tbody></table>';
+    return t;
+  }
+
+  function lv(label,val,cls){
+    return '<p><span class="lbl">'+label+':</span> <span'+(cls?' class="'+cls+'"':'')+'>'+String(val||'--')+'</span></p>';
+  }
+
+  function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+  function daySection(data,d_){
+    if(!data)return '<p style="color:#999;font-style:italic">No data recorded.</p>';
+    let s='';
+    // Attendance
+    s+='<h3>Attendance</h3>';
+    const ec=S.employees.length;let pr=0,ab=0,lt=0,vc=0,ns=0;
+    const abn=[],ltn=[],vcn=[],nsn=[];
+    S.employees.forEach(function(e,i){
+      const st=data.emps[i]?.status||'present';
+      if(st==='present')pr++;
+      else if(st==='absent'){ab++;abn.push(e.name);}
+      else if(st==='late'){lt++;pr++;ltn.push(e.name);}
+      else if(st==='vacation'){vc++;vcn.push(e.name);}
+      else if(st==='ns'){ns++;nsn.push(e.name);}
+      else pr++;
+    });
+    const sched=ec-ns,pct=sched?Math.round(pr/sched*100):0;
+    s+=tbl(['Present','Absent','Late','Vacation','Not Scheduled','Attendance %'],
+      [[pr+'/'+sched,ab,lt,vc,ns,pct+'%']]);
+    if(abn.length)s+=lv('Absent',escH(abn.join(', ')),'red');
+    if(ltn.length)s+=lv('Late',escH(ltn.join(', ')),'amber');
+    if(vcn.length)s+=lv('Vacation',escH(vcn.join(', ')));
+    if(nsn.length)s+=lv('Not Scheduled',escH(nsn.join(', ')));
+
+    // Production
+    const pRows=[];let tp=0,tg=0;
+    S.stations.forEach(function(st){
+      const p=data.prod[st];if(!p||!p.actual)return;
+      const a=parseFloat(p.actual)||0,g=parseFloat(p.goal)||0;tp+=a;if(g)tg+=g;
+      const pct=g?Math.round(a/g*100)+'%':'--';
+      pRows.push([escH(st),a.toLocaleString(),g?g.toLocaleString():'--',pct]);
+    });
+    if(pRows.length){
+      s+='<h3>Production (lbs)</h3>';
+      pRows.push(['<strong>TOTAL</strong>','<strong>'+tp.toLocaleString()+'</strong>',tg?tg.toLocaleString():'--',tg?'<strong>'+Math.round(tp/tg*100)+'%</strong>':'--']);
+      s+=tbl(['Station','Actual (lbs)','Goal (lbs)','% of Goal'],pRows);
+    }
+
+    // Downtime
+    const dtRows=[];let totalDT=0;
+    S.stations.forEach(function(st){
+      const p=data.prod[st];
+      const hasProd=p&&parseFloat(p.actual||0)>0;
+      (p?.downtimes||[]).forEach(function(dt){
+        if(dt.cat==='Break'&&!hasProd)return;
+        const m=parseInt(dt.mins)||0;totalDT+=m;
+        dtRows.push([escH(st),m+' min',escH(dt.cat),escH(dt.desc||'')]);
+      });
+    });
+    if(dtRows.length){
+      s+='<h3>Downtime</h3>';
+      dtRows.push(['<strong>TOTAL</strong>','<strong>'+totalDT+' min</strong>','','']);
+      s+=tbl(['Station','Duration','Category','Description'],dtRows);
+    }
+
+    // Safety
+    s+='<h3>Safety</h3>';
+    s+=lv('Pre-Shift Meeting',data.preshift?'Completed'+(data.preshiftTopic?' -- '+escH(data.preshiftTopic):''):'Not completed',data.preshift?'green':'red');
+    s+=lv('Days w/o Accident',String(calcAccidentDays()));
+    if(data.incident){s+=lv('INCIDENT',escH(data.incType+' -- '+(data.incDesc||'')),'red');s+=lv('Formal Report',data.incReport||'--');}
+    else s+=lv('Incidents','None reported','green');
+    if(data.safetyObs)s+=lv('Observations',escH(data.safetyObs));
+
+    // Quality
+    s+='<h3>Quality</h3>';
+    if(data.scrap&&data.scrapEntries?.length){
+      let tl=0,tc=0;
+      const sRows=data.scrapEntries.map(function(e){tl+=parseFloat(e.lbs)||0;tc+=parseFloat(e.pcs)||0;return[escH(e.station),escH(e.defect),e.lbs||0,e.pcs||0,e.notified,escH(e.action||'--')];});
+      sRows.push(['<strong>TOTAL</strong>','','<strong>'+tl+'</strong>','<strong>'+tc+'</strong>','','']);
+      s+=tbl(['Station','Defect','Scrap (lbs)','Pieces','Notified','Action'],sRows);
+    }else s+=lv('Scrap / Rejects','None reported','green');
+
+    // Personnel
+    if(data.coaching?.length){
+      s+='<h3>Personnel Conversations</h3>';
+      s+=tbl(['Type','Employee','Topic / Notes'],data.coaching.map(function(c){return[escH(c.type),escH(c.emp),escH(c.topic)];}));
+    }
+
+    // Notes
+    if(data.matLow||data.handoff||data.freeNotes||data.followup){
+      s+='<h3>Notes & Handoff</h3>';
+      if(data.matLow)s+=lv('Low Materials',escH(data.matLow),'amber');
+      if(data.handoff)s+=lv('Handoff to Next Shift',escH(data.handoff));
+      if(data.followup)s+=lv('Follow-Up',escH(data.followup));
+      if(data.freeNotes)s+=lv('General Notes',escH(data.freeNotes));
+    }
+    return s;
+  }
+
+  let body='';
+  if(type==='daily'){
+    const d=new Date(dayKey+'T12:00:00');
+    body+='<h1>PENN ALUMINUM INTERNATIONAL LLC</h1>';
+    body+='<div class="sub">DAILY SHIFT REPORT &nbsp;|&nbsp; Supervisor: <strong>'+S.supervisor+'</strong> &nbsp;|&nbsp; '+S.dept+' &nbsp;|&nbsp; '+S.shift+'<br>'+DN[d.getDay()]+', '+MN[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear()+'</div>';
+    body+=daySection(S.week[dayKey],dayKey);
+  }else{
+    let wP=0,wS=0,wDt=0,wI=0,wPres=0,wEmp=0;
+    selDays.forEach(function(d){
+      const dd=S.week[ds(d)];if(!dd)return;
+      Object.values(dd.prod||{}).forEach(function(p){
+        const hasProd=parseFloat(p.actual||0)>0;
+        wP+=parseFloat(p.actual)||0;
+        (p.downtimes||[]).forEach(function(dt){if(dt.cat==='Break'&&!hasProd)return;wDt+=parseInt(dt.mins)||0;});
+      });
+      (dd.scrapEntries||[]).forEach(function(e){wS+=parseFloat(e.lbs)||0;});
+      if(dd.incident)wI++;
+      const ec=S.employees.length;wEmp+=ec;
+      Object.values(dd.emps||{}).forEach(function(e){if(e.status==='present'||e.status==='late')wPres++;});
+    });
+    body+='<h1>PENN ALUMINUM INTERNATIONAL LLC</h1>';
+    body+='<div class="sub">WEEKLY SUPERVISOR REPORT &nbsp;|&nbsp; Supervisor: <strong>'+S.supervisor+'</strong> &nbsp;|&nbsp; '+S.dept+' &nbsp;|&nbsp; '+S.shift+'<br>Week: '+MN[selDays[0].getMonth()]+' '+selDays[0].getDate()+' &ndash; '+MN[selDays[selDays.length-1].getMonth()]+' '+selDays[selDays.length-1].getDate()+', '+selDays[0].getFullYear()+'</div>';
+    body+='<table class="kpi"><thead><tr>';
+    [{v:wP.toLocaleString()+' lbs'},{v:wEmp?Math.round(wPres/wEmp*100)+'%':'--'},{v:wS+' lbs'},{v:wDt+' min'},{v:String(wI)},{v:String(calcAccidentDays())}].forEach(function(m){body+='<th>'+m.v+'</th>';});
+    body+='</tr></thead><tbody><tr>';
+    ['Total Production','Avg Attendance','Total Scrap','Total Downtime','Incidents','Days w/o Accident'].forEach(function(l){body+='<td>'+l+'</td>';});
+    body+='</tr></tbody></table>';
+    selDays.forEach(function(d){
+      const d_=ds(d),data=S.week[d_];
+      body+='<h2>'+DN[d.getDay()].toUpperCase()+' '+MN[d.getMonth()]+' '+d.getDate()+'</h2>';
+      body+=daySection(data,d_);
+    });
+    const oR=S.repairs.filter(function(r){return !r.resolved;});
+    if(oR.length){body+='<h2>OPEN REQUESTS</h2>';body+=tbl(['Equipment/Item','Description','Priority','Category'],oR.map(function(r){return[escH(r.equip),escH(r.desc),r.priority.toUpperCase(),r.cat||''];}));}
+    const pT=S.todos.filter(function(t){return !t.done;});
+    if(pT.length){body+='<h2>PENDING ACTION ITEMS</h2>';body+=tbl(['Task','Priority','Assigned To'],pT.map(function(t){return[escH(t.text),t.priority.toUpperCase(),escH(t.assign)];}));}
+  }
+  body+='<div class="footer">Penn Aluminum International LLC | Murphysboro, IL | Marmon Holdings / Berkshire Hathaway | Supervisor: '+S.supervisor+' | Generated: '+new Date().toLocaleString('en-US')+'</div>';
+
+  const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'+css+'</style></head><body>'+body+'</body></html>';
+  const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-word;charset=utf-8'});
   const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download='penn-report-data.json';a.click();
-  URL.revokeObjectURL(url);
-  alert('Report data downloaded as JSON.\n\nTo generate the professional Word document:\n1. Open a terminal in the same folder as your app files\n2. Run: node gen-report.js "" weekly-report.docx\n\nThe Word file will be created with the Penn Aluminum logo and executive format.');
+  const a=document.createElement('a');
+  const wd2=getSelectedWeekDays();
+  a.href=url;
+  a.download=type==='weekly'?'PennAluminum_Weekly_'+ds(wd2[0])+'.doc':'PennAluminum_Daily_'+dayKey+'.doc';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},1000);
 }
 
 // -- Settings ------------------------------------------------------------------
@@ -1458,7 +1677,43 @@ function buildSettings(){
   const ss=document.getElementById('set-sup'),sd=document.getElementById('set-dept'),sf=document.getElementById('set-shift'),sfa=document.getElementById('set-fac');
   if(ss)ss.value=S.supervisor;if(sd)sd.value=S.dept;if(sf)sf.value=S.shift;if(sfa)sfa.value=S.facility;
   const sl=document.getElementById('st-settings');
-  if(sl){sl.innerHTML='';S.stations.forEach((st,i)=>{const ec=S.employees.filter(e=>e.station===st).length;const div=document.createElement('div');div.className='sti';div.innerHTML='<span class="stn">'+st+'</span><span class="stm">'+ec+' empl.</span><button class="btn brd bsm" onclick="removeSt('+i+')">Remove</button>';sl.appendChild(div);});}
+  if(sl){
+    sl.innerHTML='';
+    S.stations.forEach(function(st,i){
+      const ec=S.employees.filter(function(e){return e.station===st;}).length;
+      const div=document.createElement('div');
+      div.className='sti';
+      div.style.cssText='cursor:grab;user-select:none;gap:6px';
+      div.dataset.idx=String(i);
+      div.setAttribute('draggable','true');
+      div.innerHTML=
+        '<span style="color:var(--tx3);font-size:18px;cursor:grab;flex-shrink:0">&#8801;</span>'+
+        '<input type="text" value="'+escT(st)+'" '+
+          'onchange="renameStation('+i+',this.value)" '+
+          'style="flex:1;background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r);color:var(--tx);font-size:13px;padding:5px 9px;min-width:0">'+
+        '<span class="stm" style="flex-shrink:0">'+ec+' emp</span>'+
+        '<button class="btn brd bsm" style="flex-shrink:0" onclick="removeSt('+i+')">Remove</button>';
+      // Drag events
+      div.addEventListener('dragstart',function(e){
+        e.dataTransfer.setData('text/plain',String(i));
+        div.style.opacity='0.4';
+      });
+      div.addEventListener('dragend',function(){div.style.opacity='1';sl.querySelectorAll('.sti').forEach(function(d){d.style.borderTop='';});});
+      div.addEventListener('dragover',function(e){e.preventDefault();div.style.borderTop='2px solid var(--ac)';});
+      div.addEventListener('dragleave',function(){div.style.borderTop='';});
+      div.addEventListener('drop',function(e){
+        e.preventDefault();
+        div.style.borderTop='';
+        const fromIdx=parseInt(e.dataTransfer.getData('text/plain'));
+        const toIdx=parseInt(div.dataset.idx);
+        if(fromIdx===toIdx||isNaN(fromIdx)||isNaN(toIdx))return;
+        const moved=S.stations.splice(fromIdx,1)[0];
+        S.stations.splice(toIdx,0,moved);
+        persist();buildSettings();buildProdList();loadDay();
+      });
+      sl.appendChild(div);
+    });
+  }
   const el=document.getElementById('emp-settings');
   if(el){el.innerHTML='';S.employees.forEach((e,i)=>{const c=AVC[i%AVC.length],init=e.name.split(' ').map(w=>w[0]).slice(0,2).join('');const div=document.createElement('div');div.className='sti';div.innerHTML='<div style="width:22px;height:22px;border-radius:50%;background:'+c.bg+';color:'+c.fg+';font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:600;flex-shrink:0">'+init+'</div><span class="stn">'+e.name+'</span><span class="stm">'+e.station+'</span><button class="btn brd bsm" onclick="removeEmp('+i+')">Remove</button>';el.appendChild(div);});}
 }
@@ -1841,6 +2096,20 @@ function kpiMini(val,lbl,color){
     '<div style="font-size:16px;font-weight:700;color:'+color+';font-family:var(--mo)">'+val+'</div>'+
     '<div style="font-size:10px;color:var(--tx3);margin-top:2px;text-transform:uppercase">'+lbl+'</div>'+
   '</div>';
+}
+
+function renameStation(i, newName){
+  newName = newName.trim();
+  if(!newName)return;
+  const oldName = S.stations[i];
+  S.stations[i] = newName;
+  // Update employees with this station
+  S.employees.forEach(function(e){if(e.station===oldName)e.station=newName;});
+  // Update production data
+  Object.values(S.week).forEach(function(day){
+    if(day.prod&&day.prod[oldName]){day.prod[newName]=day.prod[oldName];delete day.prod[oldName];}
+  });
+  persist();buildSettings();buildEmpGrid();buildProdList();
 }
 </script>
 </body>
